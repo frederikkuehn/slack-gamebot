@@ -51,7 +51,7 @@ set api [on|off]: enable/disable team data in the public API, default is off
         client.say(channel: data.channel, text: [
           HELP,
           SlackGamebot::INFO,
-          client.owner.reload.premium? ? nil : client.owner.upgrade_text
+          nil
         ].compact.join("\n"))
         client.say(channel: data.channel, gif: 'help')
         logger.info "HELP: #{client.owner} - #{data.user}"
