@@ -35,16 +35,19 @@ Captains
 --------
 promote <player>: promote a user to captain
 demote me: demote you from captain
+set nickname <player> [name], unset nickname <player>: set/unset someone's nickname
 
 Premium
 -------
 seasons: show all seasons
 reset <team>: reset all stats, start a new season
 unregister <player>: remove a player from the leaderboard
+set nickname [name], unset nickname: set/unset your nickname displayed in leaderboards
 set gifs [on|off]: enable/disable animated GIFs, default is on
-set aliases [<alias|none> ...]: set additional bot aliases
+set aliases [<alias> ...], unset aliases: set/unset additional bot aliases
 set elo [number]: set base elo for the team
 set api [on|off]: enable/disable team data in the public API, default is off
+set unbalanced [on|off]: allow matches between different numbers of players, default is off
 ```
         EOS
       def self.call(client, data, _match)

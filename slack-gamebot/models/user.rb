@@ -6,12 +6,16 @@ class User
   field :user_name, type: String
   field :wins, type: Integer, default: 0
   field :losses, type: Integer, default: 0
+  field :losing_streak, type: Integer, default: 0
+  field :winning_streak, type: Integer, default: 0
   field :ties, type: Integer, default: 0
   field :elo, type: Integer, default: 0
+  field :elo_history, type: Array, default: []
   field :tau, type: Float, default: 0
   field :rank, type: Integer
   field :captain, type: Boolean, default: false
   field :registered, type: Boolean, default: true
+  field :nickname, type: String
 
   belongs_to :team, index: true
   validates_presence_of :team
@@ -23,6 +27,7 @@ class User
   index(ties: 1, team_id: 1)
   index(elo: 1, team_id: 1)
 
+  before_save :update_elo_history!
   after_save :rank!
 
   SORT_ORDERS = ['elo', '-elo', 'created_at', '-created_at', 'wins', '-wins', 'losses', '-losses', 'ties', '-ties', 'user_name', '-user_name', 'rank', '-rank']
@@ -30,17 +35,30 @@ class User
   scope :ranked, -> { where(:rank.ne => nil) }
   scope :captains, -> { where(captain: true) }
 
+  def current_matches
+    Match.current.where(team: team).or({ winner_ids: _id }, loser_ids: _id)
+  end
+
   def slack_mention
     "<@#{user_id}>"
   end
 
   def display_name
-    registered ? user_name : '<unregistered>'
+    registered ? nickname || user_name : '<unregistered>'
+  end
+
+  def self.slack_mention?(user_name)
+    Regexp.last_match[1] if user_name =~ /^<@(.*)>$/
   end
 
   def self.find_by_slack_mention!(team, user_name)
-    query = user_name =~ /^<@(.*)>$/ ? { user_id: Regexp.last_match[1] } : { user_name: Regexp.new("^#{user_name}$", 'i') }
-    user = User.where(query.merge(team: team)).first
+    slack_id = slack_mention?(user_name)
+    user = if slack_id
+             User.where(user_id: slack_id, team: team).first
+           else
+             regexp = Regexp.new("^#{user_name}$", 'i')
+             User.where(team: team).or({ user_name: regexp }, nickname: regexp).first
+           end
     fail SlackGamebot::Error, "I don't know who #{user_name} is! Ask them to _register_." unless user && user.registered?
     user
   end
@@ -60,14 +78,27 @@ class User
   end
 
   def self.reset_all!(team)
-    User.where(team: team).set(wins: 0, losses: 0, ties: 0, elo: 0, tau: 0, rank: nil)
+    User.where(team: team).set(
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      elo: 0,
+      elo_history: [],
+      tau: 0,
+      rank: nil,
+      losing_streak: 0,
+      winning_streak: 0
+    )
   end
 
   def to_s
     wins_s = "#{wins} win#{wins != 1 ? 's' : ''}"
     losses_s = "#{losses} loss#{losses != 1 ? 'es' : ''}"
     ties_s = "#{ties} tie#{ties != 1 ? 's' : ''}" if ties && ties > 0
-    "#{display_name}: #{[wins_s, losses_s, ties_s].compact.join(', ')} (elo: #{team_elo})"
+    elo_s = "elo: #{team_elo}"
+    lws_s = "lws: #{winning_streak}" if winning_streak >= losing_streak && winning_streak >= 3
+    lls_s = "lls: #{losing_streak}" if losing_streak > winning_streak && losing_streak >= 3
+    "#{display_name}: #{[wins_s, losses_s, ties_s].compact.join(', ')} (#{[elo_s, lws_s, lls_s].compact.join(', ')})"
   end
 
   def team_elo
@@ -100,6 +131,11 @@ class User
     reload.rank
   end
 
+  def update_elo_history!
+    return unless elo_changed?
+    elo_history << elo
+  end
+
   def self.rank!(team)
     rank = 1
     players = any_of({ :wins.gt => 0 }, { :losses.gt => 0 }, :ties.gt => 0).where(team: team, registered: true).desc(:elo).desc(:wins).asc(:losses).desc(:ties)
@@ -109,6 +145,29 @@ class User
         player.set(rank: rank) unless rank == player.rank
       end
     end
+  end
+
+  def calculate_streaks!
+    longest_winning_streak = 0
+    longest_losing_streak = 0
+    current_winning_streak = 0
+    current_losing_streak = 0
+    current_matches.asc(:_id).each do |match|
+      if match.tied?
+        current_winning_streak = 0
+        current_losing_streak = 0
+      elsif match.winner_ids.include?(_id)
+        current_losing_streak = 0
+        current_winning_streak += 1
+      else
+        current_winning_streak = 0
+        current_losing_streak += 1
+      end
+      longest_losing_streak = current_losing_streak if current_losing_streak > longest_losing_streak
+      longest_winning_streak = current_winning_streak if current_winning_streak > longest_winning_streak
+    end
+    return if losing_streak == longest_losing_streak && winning_streak == longest_winning_streak
+    update_attributes!(losing_streak: longest_losing_streak, winning_streak: longest_winning_streak)
   end
 
   def self.rank_section(team, users)

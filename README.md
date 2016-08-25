@@ -204,12 +204,12 @@ Get the leaderboard.
 ```
 gamebot leaderboard
 
-1. Victor Barna: 3 wins, 2 losses (elo: 148)
+1. Victor Barna: 3 wins, 2 losses (elo: 148, lws: 5)
 2. Deng Yaping: 1 win, 3 losses (elo: 24)
 3. Wang Hoe: 0 wins, 1 loss (elo: -12)
 ```
 
-The leaderboard contains 3 topmost players ranked by [Elo](http://en.wikipedia.org/wiki/Elo_rating_system), use _leaderboard 10_ or _leaderboard infinity_ to see 10 players or more, respectively.
+The leaderboard contains 3 topmost players ranked by [Elo](http://en.wikipedia.org/wiki/Elo_rating_system), use _leaderboard 10_ or _leaderboard infinity_ to see 10 players or more, respectively. It also shows the longest winning (lws) and losing (lls) streaks of at least 3.
 
 In case you want to see leaderboard in reverse order (which would be totally wrong but motivational for people at the bottom of leaderboard), specify a negative number or `-infinity`:
 
@@ -218,7 +218,7 @@ gamebot leaderboard -5
 
 1. Wang Hoe: 0 wins, 1 loss (elo: -12)
 2. Deng Yaping: 1 win, 3 losses (elo: 24)
-3. Victor Barna: 3 wins, 2 losses (elo: 148)
+3. Victor Barna: 3 wins, 2 losses (elo: 148, lws: 5)
 ```
 
 #### gamebot matches [number|infinity]
@@ -329,6 +329,32 @@ gamebot unregister @WangHoe
 I've removed @WangHoe from the leaderboard.
 ```
 
+#### gamebot set nickname [name]
+
+Sets a nickname for display purposes.
+
+```
+gamebot set nickname John Doe
+```
+
+Unset a nickname.
+
+```
+gamebot unset nickname
+```
+
+Captains can set nicknames of users by using a Slack mention.
+
+```
+gamebot set nickname @WangHoe John Doe
+```
+
+Captains can unset nicknames, too.
+
+```
+gamebot unset nickname @WangHoe
+```
+
 #### gamebot set gifs on|off
 
 Enable/disable GIFs for your team.
@@ -341,12 +367,18 @@ GIFs for team China are off.
 
 ![](screenshots/gifs.gif)
 
+Using `unset gifs` is equivalent to `set gifs off`.
+
 #### gamebot set elo [number]
 
-Set the base elo for new seasons. Default is 0.
+Set and resets the base elo for new seasons. Default is 0.
 
 ```
 gamebot set elo 1000
+```
+
+```
+gamebot unset elo
 ```
 
 #### gamebot set aliases &lt;alias|none&gt; ...
@@ -359,9 +391,9 @@ gamebot set aliases pp :pong:
 Team China aliases are set to pp and :pong:.
 ```
 
-Remove all aliases with `set aliases none`.
-
 ![](screenshots/aliases.gif)
+
+Remove all aliases with `unset aliases`.
 
 #### gamebot set api on|off
 
@@ -372,6 +404,22 @@ gamebot set api on
 
 API for team China is on!
 http://www.playplay.io/api/teams/57224e65bc526eac95bfe316
+```
+
+```
+gamebot unset api
+
+API for team China is off.
+```
+
+#### gamebot set unbalanced on|off
+
+Allow unbalanced challenges with different number of opponents.
+
+```
+gamebot set unbalanced on
+
+Unbalanced challenges for team China are on!
 ```
 
 ## API

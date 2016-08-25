@@ -11,6 +11,7 @@ class Match
   belongs_to :challenge, index: true
   belongs_to :season, inverse_of: :matches, index: true
   before_create :calculate_elo!
+  after_create :update_users!
   validate :validate_scores, unless: :tied?
   validate :validate_tied_scores, if: :tied?
   validate :validate_resigned_scores, if: :resigned?
@@ -40,26 +41,28 @@ class Match
   end
 
   def self.lose!(attrs)
-    match = Match.create!(attrs)
-    match.winners.inc(wins: 1)
-    match.losers.inc(losses: 1)
-    User.rank!(match.team)
-    match
+    Match.create!(attrs)
   end
 
   def self.resign!(attrs)
-    match = Match.create!(attrs.merge(resigned: true))
-    match.winners.inc(wins: 1)
-    match.losers.inc(losses: 1)
-    User.rank!(match.team)
-    match
+    Match.create!(attrs.merge(resigned: true))
   end
 
   def self.draw!(attrs)
-    match = Match.create!(attrs.merge(tied: true))
-    match.winners.inc(ties: 1)
-    match.losers.inc(ties: 1)
-    User.rank!(match.team)
+    Match.create!(attrs.merge(tied: true))
+  end
+
+  def update_users!
+    if tied?
+      winners.inc(ties: 1)
+      losers.inc(ties: 1)
+    else
+      winners.inc(wins: 1)
+      losers.inc(losses: 1)
+    end
+    winners.each(&:calculate_streaks!)
+    losers.each(&:calculate_streaks!)
+    User.rank!(team)
   end
 
   private
@@ -112,6 +115,9 @@ class Match
     winners_elo = Elo.team_elo(winners)
     losers_elo = Elo.team_elo(losers)
 
+    losers_ratio = losers.any? ? [winners.size.to_f / losers.size, 1].min : 1
+    winners_ratio = winners.any? ? [losers.size.to_f / winners.size, 1].min : 1
+
     ratio = if winners_elo == losers_elo && tied?
               0 # no elo updates when tied and elo is equal
             elsif tied?
@@ -123,14 +129,14 @@ class Match
     winners.each do |winner|
       e = 100 - 1.0 / (1.0 + (10.0**((losers_elo - winner.elo) / 400.0))) * 100
       winner.tau += 0.5
-      winner.elo += e * ratio * (Elo::DELTA_TAU**winner.tau)
+      winner.elo += e * ratio * (Elo::DELTA_TAU**winner.tau) * winners_ratio
       winner.save!
     end
 
     losers.each do |loser|
       e = 100 - 1.0 / (1.0 + (10.0**((loser.elo - winners_elo) / 400.0))) * 100
       loser.tau += 0.5
-      loser.elo -= e * ratio * (Elo::DELTA_TAU**loser.tau)
+      loser.elo -= e * ratio * (Elo::DELTA_TAU**loser.tau) * losers_ratio
       loser.save!
     end
   end
