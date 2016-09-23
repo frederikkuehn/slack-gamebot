@@ -126,17 +126,18 @@ class Match
               1 # whole elo
             end
 
+    winner_score = tied? ? 0.5 : 1
+    loser_score = tied? ? 0.5 : 0
+
     winners.each do |winner|
-      e = 100 - 1.0 / (1.0 + (10.0**((losers_elo - winner.elo) / 400.0))) * 100
-      winner.tau += 0.5
-      winner.elo += e * ratio * (Elo::DELTA_TAU**winner.tau) * winners_ratio
+      e = 1.0 / (1.0 + (10.0**((losers_elo - winner.elo) / 400.0)))
+      winner.elo += Elo::DELTA_TAU * (winner_score - e) * winners_ratio
       winner.save!
     end
 
     losers.each do |loser|
-      e = 100 - 1.0 / (1.0 + (10.0**((loser.elo - winners_elo) / 400.0))) * 100
-      loser.tau += 0.5
-      loser.elo -= e * ratio * (Elo::DELTA_TAU**loser.tau) * losers_ratio
+      e = 1.0 / (1.0 + (10.0**((winners_elo - loser.elo) / 400.0)))
+      loser.elo += Elo::DELTA_TAU * (loser_score - e) * losers_ratio
       loser.save!
     end
   end
