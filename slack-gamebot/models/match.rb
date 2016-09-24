@@ -130,14 +130,16 @@ class Match
     loser_score = tied? ? 0.5 : 0
 
     winners.each do |winner|
-      e = 1.0 / (1.0 + (10.0**((losers_elo - winner.elo) / 400.0)))
-      winner.elo += Elo::DELTA_TAU * (winner_score - e) * winners_ratio
+      e = 1.0 / (1.0 + (10.0**((losers_elo.to_f - winner.elo.to_f) / 400.0)))
+      winner_change = Elo::DELTA_TAU.to_f * (winner_score.to_f - e) * winners_ratio.to_f
+      winner.elo += winner_change.to_i
       winner.save!
     end
 
     losers.each do |loser|
-      e = 1.0 / (1.0 + (10.0**((winners_elo - loser.elo) / 400.0)))
-      loser.elo += Elo::DELTA_TAU * (loser_score - e) * losers_ratio
+      e = 1.0 / (1.0 + (10.0**((winners_elo.to_f - loser.elo.to_f) / 400.0)))
+      loser_change = Elo::DELTA_TAU.to_f * (loser_score.to_f - e) * losers_ratio.to_f
+      loser.elo += loser_change.to_i
       loser.save!
     end
   end
